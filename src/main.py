@@ -42,7 +42,7 @@ def draw_markings(frame, markings):
 
 # Função para calcular e plotar o histograma de uma região
 def plot_histogram(region, ax):
-    hist = cv2.calcHist([region], [0], None, [256], [0, 256])
+    hist = cv2.calcHist([region], [0], None, [256], [1, 256])
     ax.clear()
     ax.plot(hist, color='k')
     ax.set_xlim([0, 256])
@@ -54,11 +54,13 @@ def plot_histogram(region, ax):
 def calculate_histograms(frame, markings, ax):
     for marking in markings:
         pts = np.array(marking, np.int32)
+        print(pts)
         pts = pts.reshape((-1, 1, 2))
         mask = np.zeros(frame.shape[:2], dtype=np.uint8)
         cv2.fillPoly(mask, [pts], 255)
         region = cv2.bitwise_and(frame, frame, mask=mask)
         region_gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+        print(region_gray)
         plot_histogram(region_gray, ax)
     ax.figure.canvas.draw()
 
@@ -85,8 +87,8 @@ def start_processing():
         ret, frame = cap.read()
         if not ret:
             break
-        frame = draw_markings(frame, markings)
         calculate_histograms(frame, markings, ax)
+        frame = draw_markings(frame, markings)
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(img)
         imgtk = ImageTk.PhotoImage(image=img)
@@ -94,7 +96,7 @@ def start_processing():
         panel.config(image=imgtk)
         root.update_idletasks()
         root.update()
-        if cv2.waitKey(speed) & 0xFF == ord('q'):
+        if cv2.waitKey(1000) & 0xFF == ord('q'):
             break
     
     # plt.ioff()  # Desabilitar modo interativo do matplotlib
@@ -116,6 +118,8 @@ def update_image():
 def adjust_speed(val):
     global speed
     speed = int(val)
+
+
 
 # Inicializar a interface Tkinter
 root = tk.Tk()
@@ -169,11 +173,34 @@ btn_start.pack(side="right", padx=10, pady=10)
 histogram_frame = tk.Frame(right_frame)
 histogram_frame.pack(side="bottom", fill="both", expand=True)
 
+
+# Adicionar barra de progresso do vídeo
+global video_slider
+video_slider = tk.Scale(root, from_=0, to=100, orient='horizontal', label="Progresso do Vídeo", length=500)
+video_slider.pack(side="bottom", fill="x", expand="no")
+
+def setup_video_progress():
+    global video_slider
+    """ Configura a barra de progresso para o vídeo. """
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    video_slider.config(to=total_frames, tickinterval=int(total_frames / 10))
+
+def update_video_progress():
+    global video_slider
+    """ Atualiza a posição da barra de progresso conforme o vídeo avança. """
+    current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+    video_slider.set(current_frame)
+    root.after(50, update_video_progress)
+
+setup_video_progress()
+
+update_video_progress()
+
 # Adicionar controle deslizante para ajustar a velocidade
-speed = 30  # Valor padrão do delay (milissegundos)
-speed_slider = tk.Scale(right_frame, from_=1, to=100, orient=tk.HORIZONTAL, label="Velocidade do Vídeo", command=adjust_speed)
-speed_slider.set(speed)
-speed_slider.pack(padx=10, pady=10)
+# speed = 30  # Valor padrão do delay (milissegundos)
+# speed_slider = tk.Scale(right_frame, from_=0, to=1, orient=tk.HORIZONTAL, label="Velocidade do Vídeo", command=adjust_speed, resolution=1000)
+# speed_slider.set(speed)
+# speed_slider.pack(padx=10, pady=10)
 
 # Iniciar o loop do Tkinter
 root.mainloop()
