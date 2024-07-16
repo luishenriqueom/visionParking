@@ -122,7 +122,7 @@ root = tk.Tk()
 root.title("Sistema de Marcação de Vagas")
 
 # Frame do vídeo
-video_path = 'C:\\Users\\Luis\\Documents\\ufpi\\7_periodo\\visao_computacional\\final_project\\video\\Parking.mp4'
+video_path = 'video\Parking.mp4'
 cap = cv2.VideoCapture(video_path)
 
 # Lista para armazenar as marcações e os pontos
