@@ -10,6 +10,7 @@ import numpy as np
 def click_event(event, x, y, flags, params):
     if event == cv2.EVENT_LBUTTONDOWN:
         points.append((x, y))
+        print(points)
         cv2.circle(initialFrame, (x, y), 5, (0, 255, 0), -1)
         if len(points) > 1:
             cv2.line(initialFrame, points[-2], points[-1], (255, 0, 0), 2)
