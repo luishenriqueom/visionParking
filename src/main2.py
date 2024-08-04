@@ -46,6 +46,7 @@ class Application:
         self.btn_selecionar_frame_referencia.pack(fill=tk.X)
         
         self.btn_selecionar_demarcacoes = tk.Button(self.frame_menu, text="Selecionar Demarcações", state=tk.DISABLED, command=self.select_markings)
+        self.btn_selecionar_demarcacoes = tk.Button(self.frame_menu, text="Selecionar Demarcações", state=tk.DISABLED, command=self.select_markings)
         self.btn_selecionar_demarcacoes.pack(fill=tk.X)
 
         self.btn_processar = tk.Button(self.frame_menu, text="Processar", state=tk.DISABLED, command=self.processing_video)
