@@ -12,7 +12,7 @@ class Application:
         self.video_reproducing = False
         self.video_reproducing_job = None
         self.next_frame_btn_pressed = False
-    
+
     def create_widgets(self):
         self.frame_left_side = tk.Frame(self.master)
         self.frame_right_side = tk.Frame(self.master)
@@ -37,7 +37,7 @@ class Application:
         self.btn_selecionar_video.pack(fill=tk.X)
 
         self.btn_selecionar_frame_referencia = tk.Button(self.frame_menu, text="Selecionar Frame de Referência", command=self.select_reference_frame, state=tk.DISABLED)
-        self.btn_selecionar_frame_referencia.pack(fill=tk.X)\
+        self.btn_selecionar_frame_referencia.pack(fill=tk.X)
         
         self.btn_selecionar_demarcacoes = tk.Button(self.frame_menu, text="Selecionar Demarcações", state=tk.DISABLED)
         self.btn_selecionar_demarcacoes.pack(fill=tk.X)
@@ -45,21 +45,25 @@ class Application:
         self.btn_processar = tk.Button(self.frame_menu, text="Processar", state=tk.DISABLED)
         self.btn_processar.pack(fill=tk.X)
 
-        self.test_Label = tk.Label(self.frame_menu, text="dkjfhgkls")
-        self.test_Label.pack()
-
     def select_reference_frame(self):
         current_frame_bckp = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
         print("current_frame_bckp:"+str(int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))))
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame_bckp)
         ret, self.referenced_frame = self.cap.read()
         print("new_current_frame:"+str(int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))))
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame_bckp)
         print("restored_frame:"+str(int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))))
 
+        self.display_reference_frame()
+
+    def display_reference_frame(self):
+        for widget in self.frame_referenced_video_frame.winfo_children():
+            widget.destroy()
+
         img = cv2.cvtColor(self.referenced_frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(img)
-        imgTk = ImageTk.PhotoImage(image=img)
-        panel = tk.Label(self.frame_referenced_video_frame, image=imgTk)
+        self.imgTk_ref = ImageTk.PhotoImage(image=img)
+        panel = tk.Label(self.frame_referenced_video_frame, image=self.imgTk_ref)
         panel.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         test_label = tk.Label(self.frame_referenced_video_frame, text="Referenced Frame")
         test_label.pack(side=tk.TOP)
@@ -110,8 +114,7 @@ class Application:
             self.panel.config(image=self.imgtk)
             self.panel.image = self.imgtk
             self.video_progress_bar.set(frame_number)
-    
-    
+
     def next_frame_video(self):
         self.video_progress_bar.configure(command=None)
         print("next current frame:"+str(int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))))
@@ -130,7 +133,7 @@ class Application:
         self.video_progress_bar.configure(command=self.update_frame_from_progress)
 
     def play_video(self):
-        if (self.video_reproducing):
+        if self.video_reproducing:
             self.master.after_cancel(self.video_reproducing_job)
             self.video_reproducing = False
             self.btn_play_video["text"] = "▷"
@@ -154,7 +157,7 @@ class Application:
             self.play_video()
 
     def update_frame_from_progress(self, value):
-        if not(self.next_frame_btn_pressed):
+        if not self.next_frame_btn_pressed:
             frame_number = int(value)
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
             self.ret, frame = self.cap.read()
@@ -168,4 +171,3 @@ class Application:
 root = tk.Tk()
 Application(root)
 root.mainloop()
-
