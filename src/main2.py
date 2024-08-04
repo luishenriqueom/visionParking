@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 import tkinter as tk
 from tkinter import filedialog as fd
 
@@ -27,14 +27,13 @@ class Application:
         self.frame_buttons_player = tk.Frame(self.frame_right_side)
 
         self.frame_referenced_video_frame = tk.Frame(self.master)
-        self.frame_referenced_video_frame.config()
         
         self.frame_left_side.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         self.frame_menu = tk.Frame(self.frame_left_side)
         self.frame_menu["pady"] = 20
         self.frame_menu["padx"] = 20
-        self.frame_menu.pack(side=tk.TOP, expand=True, fill=tk.Y)
+        self.frame_menu.pack(side=tk.TOP)
         
         # self.label_right_side = tk.Label(self.frame_right_side, text="Right Side")
         # self.label_right_side.pack()
@@ -90,48 +89,41 @@ class Application:
         self.btn_selecionar_demarcacoes["command"] = self.select_markings
 
     def crop_image(self, img, points):
-        mask = np.zeros_like(img)
+        points = np.array(points)
+        mask = np.zeros(img.shape[:2], dtype=np.uint8)
         cv2.fillPoly(mask, [points], 255)
-        cropped_img = cv2.bitwise_and(img, mask)
-        x,y,w,h = cv2.boundingRect(points)
-        final_img = cropped_img[y:y+h, x:x+w]
-        return final_img
+        cropped_img = cv2.bitwise_and(img, img, mask=mask)
+        x, y, w, h = cv2.boundingRect(points)
+        return cropped_img[y:y + h, x:x + w]
+
+    def remove_bg(self, img):
+        alpha = np.sum(img, axis=-1) > 0
+        alpha = np.uint8(alpha * 255)
+        return np.dstack((img, alpha))   
 
     def processing_video(self):
-        frame_cropped_images = tk.Frame(self.frame_left_side, background="blue")
-        frame_cropped_images.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        frame_cropped_images = tk.Frame(self.frame_left_side)
+        frame_cropped_images.pack()
 
-        cropped_image = self.crop_image(self.to_processing_frame, np.array(self.markings))
-        img = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2RGB)
+        print(self.markings)
+        cropped_image = self.crop_image(self.to_processing_frame, self.markings[0])
+        cropped_imagem_without_bg = self.remove_bg(cropped_image)
+
+        img = cv2.cvtColor(cropped_imagem_without_bg, cv2.COLOR_BGR2RGBA)
         img = Image.fromarray(img)
 
         self.imgTk_cropped = ImageTk.PhotoImage(image=img)
         panel = tk.Label(frame_cropped_images, image=self.imgTk_cropped)
-        panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-    def draw_polygon(self, img, points):
-        # Converte a lista de pontos para o formato de array de pontos do OpenCV
-        pts = np.array(points, np.int32)
-        pts = pts.reshape((-1, 1, 2))
-        # Desenha o polígono na imagem
-        cv2.fillPoly(img, [pts], (0, 255, 0))  # Você pode escolher a cor e o preenchimento como preferir
-        return img
-
-    def crop_polygon(self, img, points):
-        mask = np.zeros_like(img)
-        mask = self.draw_polygon(mask, points)
-        masked_img = cv2.bitwise_and(img, mask)
-        # Cria uma máscara binária
-        gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-        # Extraí a ROI usando a máscara
-        return cv2.bitwise_and(img, img, mask=gray_mask)
+        panel.pack(side=tk.LEFT)
 
     def select_reference_frame(self):
         current_frame_bckp = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
         print("current_frame_bckp:"+str(int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))))
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame_bckp)
+
         ret, self.referenced_frame = self.cap.read()
         self.to_processing_frame = self.referenced_frame.copy()
+
         print("new_current_frame:"+str(int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))))
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame_bckp)
         print("restored_frame:"+str(int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))))
@@ -254,6 +246,10 @@ class Application:
                 self.panel.config(image=self.imgtk)
                 self.panel.image = self.imgtk
 
-root = tk.Tk()
-Application(root)
-root.mainloop()
+def main():
+    root = tk.Tk()
+    Application(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
