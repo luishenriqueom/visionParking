@@ -39,7 +39,7 @@ class Application:
         self.btn_selecionar_frame_referencia = tk.Button(self.frame_menu, text="Selecionar Frame de Referência", command=self.select_reference_frame, state=tk.DISABLED)
         self.btn_selecionar_frame_referencia.pack(fill=tk.X)
         
-        self.btn_selecionar_demarcacoes = tk.Button(self.frame_menu, text="Selecionar Demarcações", state=tk.DISABLED)
+        self.btn_selecionar_demarcacoes = tk.Button(self.frame_menu, text="Selecionar Demarcações", state=tk.DISABLED, command=self.select_markings)
         self.btn_selecionar_demarcacoes.pack(fill=tk.X)
 
         self.btn_processar = tk.Button(self.frame_menu, text="Processar", state=tk.DISABLED)
@@ -55,6 +55,16 @@ class Application:
         print("restored_frame:"+str(int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))))
 
         self.display_reference_frame()
+        self.btn_selecionar_demarcacoes["state"] = tk.NORMAL
+
+    def select_markings(self):
+        self.btn_selecionar_demarcacoes["text"] = "Finalizar Seleção de Demarcações"
+        self.btn_selecionar_demarcacoes["command"] = self.finish_selecting_markings
+
+    def finish_selecting_markings(self):
+        self.btn_selecionar_demarcacoes["text"] = "Selecionar Demarcações"
+        self.btn_selecionar_demarcacoes["command"] = self.select_markings
+
 
     def display_reference_frame(self):
         for widget in self.frame_referenced_video_frame.winfo_children():
