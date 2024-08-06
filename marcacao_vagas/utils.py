@@ -1,12 +1,18 @@
 import cv2
 import numpy as np
 
-def calculate_histogram(image):
+def equalize_histogram(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    equalized = cv2.equalizeHist(gray)
+    return cv2.cvtColor(equalized, cv2.COLOR_GRAY2BGR)
+
+def calculate_histogram(image):
+    equalized_image = equalize_histogram(image)
+    gray = cv2.cvtColor(equalized_image, cv2.COLOR_BGR2GRAY)
     hist = cv2.calcHist([gray], [0], None, [256], [1, 256])
     return cv2.normalize(hist, hist).flatten()
 
-def is_parking_spot_occupied(current_hist, reference_hist, threshold=0.3):
+def is_parking_spot_occupied(current_hist, reference_hist, threshold=0.2):
     correlation = cv2.compareHist(reference_hist, current_hist, cv2.HISTCMP_CORREL)
     return correlation < threshold  # Se a correlação for menor que o limiar, consideramos a vaga ocupada
 

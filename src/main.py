@@ -114,7 +114,7 @@ def update_image():
     imgtk = ImageTk.PhotoImage(image=img)
     panel.imgtk = imgtk
     panel.config(image=imgtk)
-
+    
 # Função para ajustar a velocidade do vídeo
 def adjust_speed(val):
     global speed
@@ -127,7 +127,7 @@ root = tk.Tk()
 root.title("Sistema de Marcação de Vagas")
 
 # Frame do vídeo
-video_path = 'video\Parking.mp4'
+video_path = 'video/Parking.mp4'
 cap = cv2.VideoCapture(video_path)
 
 # Lista para armazenar as marcações e os pontos

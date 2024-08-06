@@ -4,7 +4,7 @@ from tkinter import filedialog as fd
 from PIL import Image, ImageTk
 from widgets import create_widgets
 from video_processing import process_video_frame
-from utils import crop_image, remove_bg, is_parking_spot_occupied, calculate_histogram
+from utils import crop_image, remove_bg, is_parking_spot_occupied, calculate_histogram, equalize_histogram
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -24,16 +24,18 @@ class Application:
     def create_widgets(self):
         create_widgets(self)
 
-    def click_event(self, event):
-        self.points.append((event.x, event.y))
-        cv2.circle(self.referenced_frame, (event.x, event.y), 5, (0, 255, 0), -1)
-        if len(self.points) > 1:
-            cv2.line(self.referenced_frame, self.points[-2], self.points[-1], (255, 0, 0), 2)
-        if len(self.points) == 4:
-            cv2.line(self.referenced_frame, self.points[-1], self.points[0], (255, 0, 0), 2)
-            self.markings.append(self.points.copy())
-            self.points.clear()
-        self.update_ref_image()
+    def click_event(self, event, x, y, flags, params):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.points.append((x, y))
+            cv2.circle(self.referenced_frame, (x, y), 5, (0, 255, 0), -1)
+            if len(self.points) > 1:
+                cv2.line(self.referenced_frame, self.points[-2], self.points[-1], (255, 0, 0), 2)
+            if len(self.points) == 4:
+                cv2.line(self.referenced_frame, self.points[-1], self.points[0], (255, 0, 0), 2)
+                self.markings.append(self.points.copy())
+                self.points.clear()
+            cv2.imshow('Frame selecionado', self.referenced_frame)    
+        # self.update_ref_image()
 
     def update_ref_image(self):
         img = cv2.cvtColor(self.referenced_frame, cv2.COLOR_BGR2RGB)
@@ -48,7 +50,8 @@ class Application:
     def select_markings(self):
         self.btn_selecionar_demarcacoes["text"] = "Finalizar Demarcações"
         self.btn_selecionar_demarcacoes["command"] = self.finish_markings
-        self.add_marking()
+        cv2.imshow('Frame selecionado', self.referenced_frame)
+        # self.add_marking()
 
     def finish_markings(self):
         self.btn_selecionar_demarcacoes["text"] = "Selecionar Demarcações"
@@ -100,7 +103,8 @@ class Application:
             if not ret:
                 continue
             current_cropped_image = crop_image(current_frame, marking)
-            current_img = cv2.cvtColor(current_cropped_image, cv2.COLOR_BGR2RGBA)
+            current_cropped_image_eq = equalize_histogram(current_cropped_image)
+            current_img = cv2.cvtColor(current_cropped_image_eq, cv2.COLOR_BGR2RGBA)
             current_img = Image.fromarray(current_img)
             img_tk_current = ImageTk.PhotoImage(image=current_img)
 
@@ -143,6 +147,7 @@ class Application:
 
 
 
+
     def select_reference_frame(self):
         current_frame_bckp = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame_bckp)
@@ -156,14 +161,25 @@ class Application:
         self.btn_selecionar_demarcacoes["state"] = tk.NORMAL
 
     def display_reference_frame(self):
-        for widget in self.frame_referenced_video_frame.winfo_children():
-            widget.destroy()
-        img = cv2.cvtColor(self.referenced_frame, cv2.COLOR_BGR2RGB)
-        img = Image.fromarray(img)
-        self.img_tk_ref = ImageTk.PhotoImage(image=img)
-        self.label_frame_ref = tk.Label(self.frame_referenced_video_frame, image=self.img_tk_ref)
-        self.label_frame_ref.pack(side=tk.TOP)
-        self.frame_referenced_video_frame.pack(before=self.frame_right_side, side=tk.RIGHT, fill=tk.Y, expand=True)
+        cv2.imshow("Frame selecionado", self.referenced_frame)
+        cv2.setMouseCallback('Frame selecionado', self.click_event)
+        while cv2.getWindowProperty("Frame selecionado", cv2.WND_PROP_VISIBLE) == 1:
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                cv2.destroyWindow("Frame selecionado")
+                break
+        self.points.clear()
+        print("marcacoes: ", self.markings)
+        print("Fechou !!!")
+
+    # def display_reference_frame(self):
+    #     for widget in self.frame_referenced_video_frame.winfo_children():
+    #         widget.destroy()
+    #     img = cv2.cvtColor(self.referenced_frame, cv2.COLOR_BGR2RGB)
+    #     img = Image.fromarray(img)
+    #     self.img_tk_ref = ImageTk.PhotoImage(image=img)
+    #     self.label_frame_ref = tk.Label(self.frame_referenced_video_frame, image=self.img_tk_ref)
+    #     self.label_frame_ref.pack(side=tk.TOP)
+    #     self.frame_referenced_video_frame.pack(before=self.frame_right_side, side=tk.RIGHT, fill=tk.Y, expand=True)
 
     def open_video(self):
         video = fd.askopenfilename(filetypes=[("Arquivos de video", "*.mp4")])
