@@ -1,7 +1,7 @@
 import cv2
 from PIL import Image, ImageTk
 import tkinter as tk
-from utils import crop_image, remove_bg, is_parking_spot_occupied, calculate_histogram
+from utils import crop_image, remove_bg, is_parking_spot_occupied, calculate_histogram, resize_frame
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -22,3 +22,5 @@ def process_video_frame(app):
     app.btn_previous_frame.pack(side=tk.RIGHT)
     app.frame_buttons_player.pack(fill=tk.X)
     app.btn_selecionar_frame_referencia["state"] = tk.NORMAL
+    app.btn_processar["state"] = tk.NORMAL
+

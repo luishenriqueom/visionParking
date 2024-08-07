@@ -4,7 +4,7 @@ from tkinter import filedialog as fd
 from PIL import Image, ImageTk
 from widgets import create_widgets
 from video_processing import process_video_frame
-from utils import crop_image, remove_bg, is_parking_spot_occupied, calculate_histogram, equalize_histogram
+from utils import crop_image, remove_bg, is_parking_spot_occupied, calculate_histogram, equalize_histogram, resize_frame, convert_to_relative, convert_to_absolute
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -20,6 +20,8 @@ class Application:
         self.points = []
         self.markings = []
         self.img_tk_ref = None
+        self.original_size = None
+        self.resized_size = (640, 480)  # Define o tamanho padronizado para os frames
 
     def create_widgets(self):
         create_widgets(self)
@@ -32,10 +34,10 @@ class Application:
                 cv2.line(self.referenced_frame, self.points[-2], self.points[-1], (255, 0, 0), 2)
             if len(self.points) == 4:
                 cv2.line(self.referenced_frame, self.points[-1], self.points[0], (255, 0, 0), 2)
-                self.markings.append(self.points.copy())
+                relative_points = convert_to_relative(self.points, self.resized_size)
+                self.markings.append(relative_points)
                 self.points.clear()
-            cv2.imshow('Frame selecionado', self.referenced_frame)    
-        # self.update_ref_image()
+            cv2.imshow('Frame selecionado', self.referenced_frame)
 
     def update_ref_image(self):
         img = cv2.cvtColor(self.referenced_frame, cv2.COLOR_BGR2RGB)
@@ -51,7 +53,6 @@ class Application:
         self.btn_selecionar_demarcacoes["text"] = "Finalizar Demarcações"
         self.btn_selecionar_demarcacoes["command"] = self.finish_markings
         cv2.imshow('Frame selecionado', self.referenced_frame)
-        # self.add_marking()
 
     def finish_markings(self):
         self.btn_selecionar_demarcacoes["text"] = "Selecionar Demarcações"
@@ -61,11 +62,9 @@ class Application:
         if hasattr(self, 'frame_container'):
             self.frame_container.destroy()
 
-        # Cria um frame para conter o canvas e o scrollbar
         self.frame_container = tk.Frame(self.frame_left_side)
         self.frame_container.pack(fill=tk.BOTH, expand=True)
 
-        # Cria o canvas e a scrollbar
         self.canvas = tk.Canvas(self.frame_container)
         self.scrollbar = tk.Scrollbar(self.frame_container, orient=tk.VERTICAL, command=self.canvas.yview)
         self.scrollable_frame = tk.Frame(self.canvas)
@@ -83,36 +82,34 @@ class Application:
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Calcula o histograma de referência para cada marcação
         reference_histograms = []
         for marking in self.markings:
-            cropped_image = crop_image(self.to_processing_frame, marking)
+            absolute_marking = convert_to_absolute(marking, self.resized_size)
+            cropped_image = crop_image(self.to_processing_frame, absolute_marking)
             reference_hist = calculate_histogram(cropped_image)
             reference_histograms.append(reference_hist)
 
-        # Adiciona todas as imagens das marcações no frame rolável
         for i, marking in enumerate(self.markings):
-            cropped_image = crop_image(self.to_processing_frame, marking)
+            absolute_marking = convert_to_absolute(marking, self.resized_size)
+            cropped_image = crop_image(self.to_processing_frame, absolute_marking)
             cropped_image_without_bg = remove_bg(cropped_image)
             img_ref = cv2.cvtColor(cropped_image_without_bg, cv2.COLOR_BGR2RGBA)
             img_ref = Image.fromarray(img_ref)
             img_tk_ref = ImageTk.PhotoImage(image=img_ref)
 
-            # Captura o frame atual e corta a imagem da vaga atual
             ret, current_frame = self.cap.read()
             if not ret:
                 continue
-            current_cropped_image = crop_image(current_frame, marking)
+            current_frame = resize_frame(current_frame, *self.resized_size)
+            current_cropped_image = crop_image(current_frame, absolute_marking)
             current_cropped_image_eq = equalize_histogram(current_cropped_image)
             current_img = cv2.cvtColor(current_cropped_image_eq, cv2.COLOR_BGR2RGBA)
             current_img = Image.fromarray(current_img)
             img_tk_current = ImageTk.PhotoImage(image=current_img)
 
-            # Frame para conter as imagens e os histogramas
             frame_marking = tk.Frame(self.scrollable_frame)
             frame_marking.pack(side=tk.TOP, pady=10)
 
-            # Exibe as imagens de referência e atuais lado a lado
             panel_ref = tk.Label(frame_marking, image=img_tk_ref)
             panel_ref.image = img_tk_ref
             panel_ref.pack(side=tk.LEFT, padx=5)
@@ -121,14 +118,12 @@ class Application:
             panel_current.image = img_tk_current
             panel_current.pack(side=tk.LEFT, padx=5)
 
-            # Verifica se a vaga está ocupada
             current_hist = calculate_histogram(current_cropped_image)
-            occupied = is_parking_spot_occupied(current_hist, reference_histograms[i])
+            occupied = is_parking_spot_occupied(current_hist, reference_histograms[i], threshold=0.8)  # Ajuste o limiar conforme necessário
             status_text = "Ocupada" if occupied else "Livre"
             status_label = tk.Label(frame_marking, text=status_text, fg="red" if occupied else "green")
             status_label.pack(side=tk.LEFT, padx=5)
 
-            # Cria os histogramas
             fig, ax = plt.subplots(figsize=(4, 2))
             ax.plot(reference_histograms[i], color='blue', label='Referência')
             ax.plot(current_hist, color='black', label='Atual')
@@ -143,10 +138,7 @@ class Application:
             hist_widget = canvas_hist.get_tk_widget()
             hist_widget.pack(side=tk.LEFT, padx=5)
 
-            plt.close(fig)  # Fecha a figura para liberar memória
-
-
-
+            plt.close(fig)
 
     def select_reference_frame(self):
         current_frame_bckp = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
@@ -155,12 +147,15 @@ class Application:
         if not ret:
             print("Erro ao ler o frame.")
             exit()
+        self.original_size = (self.referenced_frame.shape[1], self.referenced_frame.shape[0])
+        self.referenced_frame = resize_frame(self.referenced_frame, *self.resized_size)  # Redimensiona o frame de referência
         self.to_processing_frame = self.referenced_frame.copy()
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame_bckp)
         self.display_reference_frame()
         self.btn_selecionar_demarcacoes["state"] = tk.NORMAL
 
     def display_reference_frame(self):
+        print("Abrindo frame selecionado: ", self.referenced_frame)
         cv2.imshow("Frame selecionado", self.referenced_frame)
         cv2.setMouseCallback('Frame selecionado', self.click_event)
         while cv2.getWindowProperty("Frame selecionado", cv2.WND_PROP_VISIBLE) == 1:
@@ -168,18 +163,6 @@ class Application:
                 cv2.destroyWindow("Frame selecionado")
                 break
         self.points.clear()
-        print("marcacoes: ", self.markings)
-        print("Fechou !!!")
-
-    # def display_reference_frame(self):
-    #     for widget in self.frame_referenced_video_frame.winfo_children():
-    #         widget.destroy()
-    #     img = cv2.cvtColor(self.referenced_frame, cv2.COLOR_BGR2RGB)
-    #     img = Image.fromarray(img)
-    #     self.img_tk_ref = ImageTk.PhotoImage(image=img)
-    #     self.label_frame_ref = tk.Label(self.frame_referenced_video_frame, image=self.img_tk_ref)
-    #     self.label_frame_ref.pack(side=tk.TOP)
-    #     self.frame_referenced_video_frame.pack(before=self.frame_right_side, side=tk.RIGHT, fill=tk.Y, expand=True)
 
     def open_video(self):
         video = fd.askopenfilename(filetypes=[("Arquivos de video", "*.mp4")])
@@ -191,6 +174,8 @@ class Application:
         if not self.ret:
             print("Erro ao ler o frame.")
             exit()
+        self.original_size = (self.current_video_frame.shape[1], self.current_video_frame.shape[0])
+        self.current_video_frame = resize_frame(self.current_video_frame, *self.resized_size)  # Redimensiona o frame atual
         self.config_video_interface()
         self.btn_processar["state"] = tk.NORMAL
 
@@ -215,6 +200,7 @@ class Application:
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
         self.ret, frame = self.cap.read()
         if self.ret:
+            frame = resize_frame(frame, *self.resized_size)  # Redimensiona o frame anterior
             self.img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             self.img = Image.fromarray(self.img)
             self.imgtk = ImageTk.PhotoImage(image=self.img)
@@ -226,6 +212,7 @@ class Application:
         self.video_progress_bar.configure(command=None)
         self.ret, frame = self.cap.read()
         if self.ret:
+            frame = resize_frame(frame, *self.resized_size)  # Redimensiona o próximo frame
             self.img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             self.img = Image.fromarray(self.img)
             self.imgtk = ImageTk.PhotoImage(image=self.img)
@@ -249,6 +236,7 @@ class Application:
     def update_frame(self):
         self.ret, self.current_video_frame = self.cap.read()
         if self.ret:
+            self.current_video_frame = resize_frame(self.current_video_frame, *self.resized_size)  # Redimensiona o frame atual
             self.img = cv2.cvtColor(self.current_video_frame, cv2.COLOR_BGR2RGB)
             self.img = Image.fromarray(self.img)
             self.imgtk = ImageTk.PhotoImage(image=self.img)
@@ -266,6 +254,7 @@ class Application:
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
             self.ret, self.current_video_frame = self.cap.read()
             if self.ret:
+                self.current_video_frame = resize_frame(self.current_video_frame, *self.resized_size)  # Redimensiona o frame atual do progresso
                 self.img = cv2.cvtColor(self.current_video_frame, cv2.COLOR_BGR2RGB)
                 self.img = Image.fromarray(self.img)
                 self.imgtk = ImageTk.PhotoImage(image=self.img)

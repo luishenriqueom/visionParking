@@ -50,19 +50,29 @@ def plot_histogram(region, ax):
     ax.set_title('Histograma da Região')
     ax.set_xlabel('Intensidade de Pixel')
     ax.set_ylabel('Contagem')
+    return hist
 
-# Função para calcular o histograma de cada marcação
+# Função para calcular o histograma de cada marcação e comparar com o histograma de referência
 def calculate_histograms(frame, markings, ax):
-    for marking in markings:
+    for idx, marking in enumerate(markings):
         pts = np.array(marking, np.int32)
-        print(pts)
         pts = pts.reshape((-1, 1, 2))
         mask = np.zeros(frame.shape[:2], dtype=np.uint8)
         cv2.fillPoly(mask, [pts], 255)
         region = cv2.bitwise_and(frame, frame, mask=mask)
         region_gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
-        print(region_gray)
-        plot_histogram(region_gray, ax)
+        
+        current_hist = plot_histogram(region_gray, ax)
+        
+        # Comparar histograma atual com o histograma de referência
+        diff = cv2.compareHist(ref_histograms[idx], current_hist, cv2.HISTCMP_BHATTACHARYYA)
+        print(f"Diferença do histograma para a vaga {idx + 1}: {diff}")
+        
+        if diff > threshold:
+            print(f"Vaga {idx + 1} está ocupada.")
+        else:
+            print(f"Vaga {idx + 1} está livre.")
+    
     ax.figure.canvas.draw()
 
 # Função para iniciar o processamento após as marcações
@@ -76,7 +86,7 @@ def start_processing():
     cap.release()
     cap = cv2.VideoCapture(video_path)
 
-     # Criar figura do matplotlib para exibir os histogramas
+    # Criar figura do matplotlib para exibir os histogramas
     fig, ax = plt.subplots(figsize=(5, 4))
     canvas = FigureCanvasTkAgg(fig, master=histogram_frame)
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -100,9 +110,6 @@ def start_processing():
         if cv2.waitKey(1000) & 0xFF == ord('q'):
             break
     
-    # plt.ioff()  # Desabilitar modo interativo do matplotlib
-    # plt.show()
-    
     cap.release()
     cv2.destroyAllWindows()
 
@@ -119,8 +126,6 @@ def update_image():
 def adjust_speed(val):
     global speed
     speed = int(val)
-
-
 
 # Inicializar a interface Tkinter
 root = tk.Tk()
@@ -174,7 +179,6 @@ btn_start.pack(side="right", padx=10, pady=10)
 histogram_frame = tk.Frame(right_frame)
 histogram_frame.pack(side="bottom", fill="both", expand=True)
 
-
 # Adicionar barra de progresso do vídeo
 global video_slider
 video_slider = tk.Scale(root, from_=0, to=100, orient='horizontal', label="Progresso do Vídeo", length=500)
@@ -194,7 +198,6 @@ def update_video_progress():
     root.after(50, update_video_progress)
 
 setup_video_progress()
-
 update_video_progress()
 
 # Adicionar controle deslizante para ajustar a velocidade
@@ -202,6 +205,28 @@ update_video_progress()
 # speed_slider = tk.Scale(right_frame, from_=0, to=1, orient=tk.HORIZONTAL, label="Velocidade do Vídeo", command=adjust_speed, resolution=1000)
 # speed_slider.set(speed)
 # speed_slider.pack(padx=10, pady=10)
+
+# Função para salvar o histograma de referência
+def save_reference_histograms():
+    global ref_histograms
+    ref_histograms = []
+    for idx, marking in enumerate(markings):
+        pts = np.array(marking, np.int32)
+        pts = pts.reshape((-1, 1, 2))
+        mask = np.zeros(initialFrame.shape[:2], dtype=np.uint8)
+        cv2.fillPoly(mask, [pts], 255)
+        region = cv2.bitwise_and(initialFrame, initialFrame, mask=mask)
+        region_gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+        hist = cv2.calcHist([region_gray], [0], None, [256], [1, 256])
+        ref_histograms.append(hist)
+    print("Histogramas de referência salvos.")
+
+# Adicionar botão para salvar histogramas de referência
+btn_save_ref = tk.Button(root, text="Salvar Histogramas de Referência", command=save_reference_histograms)
+btn_save_ref.pack(side="left", padx=10, pady=10)
+
+# Configurar limiar de diferença de histograma
+threshold = 0.3
 
 # Iniciar o loop do Tkinter
 root.mainloop()
