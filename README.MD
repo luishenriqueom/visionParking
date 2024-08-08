@@ -54,10 +54,3 @@ python ./src/main.py
 ```
 
 Isso iniciará a aplicação conforme definido no `main.py`.
-
-## Licença
-
-Inclua informações sobre a licença aqui, se aplicável.
-```
-
-Certifique-se de ajustar as URLs, nome do repositório, e outras informações conforme necessário.
