@@ -30,7 +30,7 @@ Ative o ambiente virtual:
 
 - **No Windows**:
   ```bash
-  venv\Scripts\activate
+  venv\Scripts\activate.bat
   ```
 - **No macOS/Linux**:
   ```bash
