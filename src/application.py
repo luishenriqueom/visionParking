@@ -182,7 +182,7 @@ class Application:
             self.frame_images_container.pack(fill=tk.Y)
 
             current_hist = calculate_histogram(current_cropped_image)
-            occupied = is_parking_spot_occupied(current_hist, self.reference_histograms[i], threshold=0.8)  # Ajuste o limiar conforme necessário
+            occupied = is_parking_spot_occupied(current_hist, self.reference_histograms[i], threshold=0.9)  # Ajuste o limiar conforme necessário
             status_text = "Ocupada" if occupied else "Livre"
             status_label = tk.Label(frame_marking, text=status_text, fg="red" if occupied else "green")
             status_label.pack(side=tk.LEFT, padx=5)
