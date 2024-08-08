@@ -12,6 +12,7 @@ class Application:
     def __init__(self, master):
         self.master = master
         self.master.title("Sistema de Marcação de Vagas")
+        self.master.state("zoomed")
         self.create_widgets()
         self.current_video_frame = None
         self.video_reproducing = False
@@ -22,6 +23,8 @@ class Application:
         self.img_tk_ref = None
         self.original_size = None
         self.resized_size = (640, 480)  # Define o tamanho padronizado para os frames
+        self.histWidgets = []
+        self.panels_curr_images = []
 
     def create_widgets(self):
         create_widgets(self)
@@ -58,6 +61,37 @@ class Application:
         self.btn_selecionar_demarcacoes["text"] = "Selecionar Demarcações"
         self.btn_selecionar_demarcacoes["command"] = self.select_markings
 
+    def plt_histogram(self, reference_histogram, current_hist):
+        fig, ax = plt.subplots(figsize=(4, 2))
+        ax.plot(reference_histogram, color='blue', label='Referência')
+        ax.plot(current_hist, color='black', label='Atual')
+        ax.set_xlim([0, 256])
+        ax.set_title('Histograma')
+        ax.set_xlabel('Intensidade')
+        ax.set_ylabel('Frequência')
+        ax.legend()       
+        return fig     
+
+    # def update_current_cropped_image(self):
+    #     ret, current_frame = self.cap.read()
+    #     if not ret:
+    #         return
+    #     current_frame = resize_frame(current_frame, *self.resized_size)
+    #     current_cropped_image = crop_image(current_frame, self.points)
+    #     current_cropped_image_eq = equalize_histogram(current_cropped_image)
+    #     current_img = cv2.cvtColor(current_cropped_image_eq, cv2.COLOR_BGR2RGBA)
+    #     current_img = Image.fromarray(current_img)
+    #     img_tk_current = ImageTk.PhotoImage(image=current_img)
+    #     self.frame_curr_image.destroy()
+    #     self.frame_curr_image = tk.Frame(self.frame_images_container)
+    #     label_curr = tk.Label(self.frame_curr_image, text="Atual")
+    #     label_curr.pack()
+    #     panel_current = tk.Label(self.frame_curr_image, image=img_tk_current)
+    #     panel_current.image = img_tk_current
+    #     panel_current.pack(side=tk.LEFT, padx=5)
+    #     self.frame_curr_image.pack(side=tk.RIGHT)
+    #     self.update_current_status(current_cropped_image)
+
     def processing_video(self):
         if hasattr(self, 'frame_container'):
             self.frame_container.destroy()
@@ -82,12 +116,12 @@ class Application:
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        reference_histograms = []
+        self.reference_histograms = []
         for marking in self.markings:
             absolute_marking = convert_to_absolute(marking, self.resized_size)
             cropped_image = crop_image(self.to_processing_frame, absolute_marking)
             reference_hist = calculate_histogram(cropped_image)
-            reference_histograms.append(reference_hist)
+            self.reference_histograms.append(reference_hist)
 
         for i, marking in enumerate(self.markings):
             absolute_marking = convert_to_absolute(marking, self.resized_size)
@@ -97,46 +131,77 @@ class Application:
             img_ref = Image.fromarray(img_ref)
             img_tk_ref = ImageTk.PhotoImage(image=img_ref)
 
-            ret, current_frame = self.cap.read()
-            if not ret:
-                continue
-            current_frame = resize_frame(current_frame, *self.resized_size)
-            current_cropped_image = crop_image(current_frame, absolute_marking)
+            # ret, current_frame = self.cap.read()
+            # if not ret:
+            #     continue
+
+            self.referenced_frame = resize_frame(self.referenced_frame, *self.resized_size)
+            current_cropped_image = crop_image(self.referenced_frame, absolute_marking)
             current_cropped_image_eq = equalize_histogram(current_cropped_image)
             current_img = cv2.cvtColor(current_cropped_image_eq, cv2.COLOR_BGR2RGBA)
             current_img = Image.fromarray(current_img)
             img_tk_current = ImageTk.PhotoImage(image=current_img)
 
-            frame_marking = tk.Frame(self.scrollable_frame)
+            frame_marking = tk.Frame(self.scrollable_frame, border=2, relief=tk.GROOVE)
             frame_marking.pack(side=tk.TOP, pady=10)
+            
+            self.frame_images_container = tk.Frame(frame_marking, pady=10)
 
-            panel_ref = tk.Label(frame_marking, image=img_tk_ref)
+            frame_ref_image = tk.Frame(self.frame_images_container)
+            label_ref = tk.Label(frame_ref_image, text="Referência")
+            label_ref.pack()
+            panel_ref = tk.Label(frame_ref_image, image=img_tk_ref)
             panel_ref.image = img_tk_ref
-            panel_ref.pack(side=tk.LEFT, padx=5)
+            self.panels_curr_images.append(panel_ref)
+            panel_ref.pack(padx=5)
+            frame_ref_image.pack(side=tk.LEFT)
+            
+            self.frame_curr_image = tk.Frame(self.frame_images_container)
+            label_curr = tk.Label(self.frame_curr_image, text="Atual")
+            label_curr.pack()
+            panel_current = tk.Label(self.frame_curr_image, image=img_tk_current)
+            panel_current.image = img_tk_current
 
-            panel_current = tk.Label(frame_marking, image=img_tk_current)
+            panel_current.pack(side=tk.LEFT, padx=5)
+            self.frame_curr_image.pack(side=tk.RIGHT)
+
+            current_cropped_image = crop_image(self.current_video_frame, absolute_marking)
+            current_cropped_image_eq = equalize_histogram(current_cropped_image)
+            current_img = cv2.cvtColor(current_cropped_image_eq, cv2.COLOR_BGR2RGBA)
+            current_img = Image.fromarray(current_img)
+            img_tk_current = ImageTk.PhotoImage(image=current_img)
+            self.frame_curr_image.destroy()
+            self.frame_curr_image = tk.Frame(self.frame_images_container)
+            label_curr = tk.Label(self.frame_curr_image, text="Atual")
+            label_curr.pack()
+            panel_current = tk.Label(self.frame_curr_image, image=img_tk_current)
             panel_current.image = img_tk_current
             panel_current.pack(side=tk.LEFT, padx=5)
+            self.frame_curr_image.pack(side=tk.RIGHT)
+
+            self.frame_images_container.pack(fill=tk.Y)
 
             current_hist = calculate_histogram(current_cropped_image)
-            occupied = is_parking_spot_occupied(current_hist, reference_histograms[i], threshold=0.8)  # Ajuste o limiar conforme necessário
+            occupied = is_parking_spot_occupied(current_hist, self.reference_histograms[i], threshold=0.8)  # Ajuste o limiar conforme necessário
             status_text = "Ocupada" if occupied else "Livre"
             status_label = tk.Label(frame_marking, text=status_text, fg="red" if occupied else "green")
             status_label.pack(side=tk.LEFT, padx=5)
 
-            fig, ax = plt.subplots(figsize=(4, 2))
-            ax.plot(reference_histograms[i], color='blue', label='Referência')
-            ax.plot(current_hist, color='black', label='Atual')
-            ax.set_xlim([0, 256])
-            ax.set_title('Histograma')
-            ax.set_xlabel('Intensidade')
-            ax.set_ylabel('Frequência')
-            ax.legend()
+            fig = self.plt_histogram(self.reference_histograms[i], current_hist)
+            # fig, ax = plt.subplots(figsize=(4, 2))
+            # ax.plot(reference_histograms[i], color='blue', label='Referência')
+            # ax.plot(current_hist, color='black', label='Atual')
+            # ax.set_xlim([0, 256])
+            # ax.set_title('Histograma')
+            # ax.set_xlabel('Intensidade')
+            # ax.set_ylabel('Frequência')
+            # ax.legend()
 
             canvas_hist = FigureCanvasTkAgg(fig, master=frame_marking)
             canvas_hist.draw()
             hist_widget = canvas_hist.get_tk_widget()
             hist_widget.pack(side=tk.LEFT, padx=5)
+            self.histWidgets.append(hist_widget)
 
             plt.close(fig)
 
@@ -155,7 +220,7 @@ class Application:
         self.btn_selecionar_demarcacoes["state"] = tk.NORMAL
 
     def display_reference_frame(self):
-        print("Abrindo frame selecionado: ", self.referenced_frame)
+        # print("Abrindo frame selecionado: ", self.referenced_frame)
         cv2.imshow("Frame selecionado", self.referenced_frame)
         cv2.setMouseCallback('Frame selecionado', self.click_event)
         while cv2.getWindowProperty("Frame selecionado", cv2.WND_PROP_VISIBLE) == 1:
@@ -163,6 +228,8 @@ class Application:
                 cv2.destroyWindow("Frame selecionado")
                 break
         self.points.clear()
+        self.histWidgets.clear()
+        self.processing_video()
 
     def open_video(self):
         video = fd.askopenfilename(filetypes=[("Arquivos de video", "*.mp4")])
@@ -188,9 +255,9 @@ class Application:
         self.btn_selecionar_frame_referencia["state"] = tk.NORMAL
         self.btn_selecionar_video["state"] = tk.DISABLED
         self.btn_processar["state"] = tk.DISABLED
-        self.btn_selecionar_demarcacoes["state"] = tk.DISABLED
+        # self.btn_selecionar_demarcacoes["state"] = tk.DISABLED
         self.btn_selecionar_frame_referencia["command"] = self.select_reference_frame
-        self.btn_selecionar_demarcacoes["command"] = self.select_markings
+        # self.btn_selecionar_demarcacoes["command"] = self.select_markings
         self.btn_selecionar_video["command"] = self.open_video
         self.btn_processar["command"] = self.processing_video
         process_video_frame(self)
@@ -233,8 +300,26 @@ class Application:
             self.btn_play_video["text"] = "⏸"
             self.update_frame()
 
+    def update_current_cropped_image(self, frame):
+        current_cropped_image = crop_image(frame, self.markings)
+        current_cropped_image_eq = equalize_histogram(current_cropped_image)
+        current_img = cv2.cvtColor(current_cropped_image_eq, cv2.COLOR_BGR2RGBA)
+        current_img = Image.fromarray(current_img)
+        img_tk_current = ImageTk.PhotoImage(image=current_img)
+        self.frame_curr_image.destroy()
+        self.frame_curr_image = tk.Frame(self.frame_images_container)
+        label_curr = tk.Label(self.frame_curr_image, text="Atual")
+        label_curr.pack()
+        panel_current = tk.Label(self.frame_curr_image, image=img_tk_current)
+        panel_current.image = img_tk_current
+        panel_current.pack(side=tk.LEFT, padx=5)
+        self.frame_curr_image.pack(side=tk.RIGHT)
+        # self.update_current_status(current_cropped_image)
+
     def update_frame(self):
         self.ret, self.current_video_frame = self.cap.read()
+        # print(self.histWidgets)
+        # self.processing_video()
         if self.ret:
             self.current_video_frame = resize_frame(self.current_video_frame, *self.resized_size)  # Redimensiona o frame atual
             self.img = cv2.cvtColor(self.current_video_frame, cv2.COLOR_BGR2RGB)
