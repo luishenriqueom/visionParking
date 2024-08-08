@@ -1,5 +1,5 @@
 # SMART PARKING
-Descrição curta do projeto.
+Solução técnica para a detecção de ocupação de vagas de estacionamento utilizando análise de histogramas de imagens
 
 ## Pré-requisitos
 
